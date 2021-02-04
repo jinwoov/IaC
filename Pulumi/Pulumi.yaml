@@ -1,0 +1,5 @@
+name: Pulum
+runtime: nodejs
+description: A minimal AWS TypeScript Pulumi program
+
+# This defines the project
