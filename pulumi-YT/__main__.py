@@ -1,40 +1,25 @@
-"""An AWS Python Pulumi program"""
+import pulumi, os, mimetypes
+import pulumi_aws as aws
 
-import pulumi
-from pulumi_aws import aws
+config = pulumi.Config()
+site_dir = config.require("siteDir") # requiring the config variable
 
-sg = aws.ec2.vpcSecurityGroupIds(
-    "web-sg",
-    description = "web sg for HTTP",
-    ingress=[
-        {
-            'protocol': 'tcp',
-            'from_port': 80,
-            'to_port': 80
-            'cidr_blocks': ['0.0.0.0/0']
-        }
-    ]
+bucket = aws.s3.Bucket("my-bucket",
+    website={
+        "index_document": "index.html"
+    }
 )
+# bucket = aws.s3.Bucket("my-bucket", bucket="this is a the name that AWS bucket is going to have")
 
-ami = aws.get_ami(
-    most_recent="true",
-    owner=['amazon'],
-    filters=[{'name': 'name', 'values': ['amzn-ami-hvm-*']}]
-)
+for file in os.listdir(site_dir):
+    filePath = os.path.join(site_dir, file) # getting the html from the folder
+    mime_type, _ = mimetypes.guess_type(filePath)# guess the mimetype of the file, python library
+    obj = aws.s3.BucketObject(file, # making the bucket object
+        bucket=bucket.id,
+        source=pulumi.FileAsset(filePath),
+        acl="public-read", # making it so that public can see it
+        content_type = mime_type
+    )
 
-user_data = """
-#!/bin/bash
-uname -n > index.html
-nohup python -m SimpleHTTPServer 80 &
-"""
-
-
-instance = aws.ec2.Instance(
-    "pulumi-webapp",
-    instance_type="t2.micro",
-    security_group=[sg.name],
-    ami = ami.id,
-    user_data = user_data
-)
-
-pulumi.export("web-app-ip", instance.public_ip)
+pulumi.export("bucket_name", bucket.id) # this is to show the output
+pulumi.export("bucket_endpoint", pulumi.Output.concat("http://", bucket.website_endpoint)) # this is way to interpolation of string value 
